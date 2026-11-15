@@ -1,0 +1,986 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bug na agenda</title>
+<meta name="description" content="Tem um bug na minha agenda: tá faltando um rolê com você.">
+<meta property="og:title" content="Bug na agenda">
+<meta property="og:description" content="Encontrei um bug e preciso da sua ajuda pra corrigir.">
+<meta name="theme-color" content="#191724">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Victor+Mono:ital,wght@0,400;0,600;1,400;1,600&display=swap">
+<style>
+/* Layout: uma janela de editor de código no centro da tela; cada passo do convite é um arquivo aberto numa aba.
+   Paleta: Rosé Pine (tema de editor) no escuro e Rosé Pine Dawn no claro. */
+:root{
+  --base:#191724; --surface:#1f1d2e; --overlay:#26233a;
+  --line:#403d52; --line-strong:#524f67;
+  --muted:#6e6a86; --subtle:#908caa; --text:#e0def4;
+  --love:#eb6f92; --gold:#f6c177; --rose:#ebbcba; --foam:#9ccfd8; --iris:#c4a7e7;
+  --accent:#eb6f92; --on-accent:#191724;
+  --shadow:0 40px 90px -30px rgba(0,0,0,.75);
+  --font-code:"Victor Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-body:"Onest", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --base:#faf4ed; --surface:#fffaf3; --overlay:#f2e9e1;
+    --line:#dfdad9; --line-strong:#cecacd;
+    --muted:#9893a5; --subtle:#797593; --text:#575279;
+    --love:#b4637a; --gold:#b87414; --rose:#c0716c; --foam:#3f8590; --iris:#8a6fa6;
+    --accent:#a8546d; --on-accent:#fffaf3;
+    --shadow:0 40px 90px -40px rgba(87,82,121,.35);
+    color-scheme:light;
+  }
+}
+:root[data-theme="light"]{
+  --base:#faf4ed; --surface:#fffaf3; --overlay:#f2e9e1;
+  --line:#dfdad9; --line-strong:#cecacd;
+  --muted:#9893a5; --subtle:#797593; --text:#575279;
+  --love:#b4637a; --gold:#b87414; --rose:#c0716c; --foam:#3f8590; --iris:#8a6fa6;
+  --accent:#a8546d; --on-accent:#fffaf3;
+  --shadow:0 40px 90px -40px rgba(87,82,121,.35);
+  color-scheme:light;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html{background:var(--base)}
+body{
+  margin:0; min-height:100vh;
+  padding-inline:16px; padding-block:clamp(16px,6vh,64px);
+  background-color:var(--base);
+  background-image:radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0);
+  background-size:24px 24px;
+  color:var(--text); font:400 16px/1.6 var(--font-body);
+  -webkit-font-smoothing:antialiased;
+}
+:focus-visible{outline:2px solid var(--iris);outline-offset:2px}
+
+/* ---------- janela ---------- */
+.window{max-width:720px;margin:0 auto;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.titlebar{display:grid;grid-template-columns:56px minmax(0,1fr) 56px;align-items:center;padding:11px 14px;background:var(--overlay);border-bottom:1px solid var(--line);font:400 12.5px/1 var(--font-code);color:var(--subtle)}
+.dots{display:flex;gap:7px}
+.dots i{display:block;width:12px;height:12px;border-radius:50%}
+.dots i:nth-child(1){background:var(--love)}
+.dots i:nth-child(2){background:var(--gold)}
+.dots i:nth-child(3){background:var(--foam)}
+.titlebar .title{text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.tabs{display:flex;overflow-x:auto;background:var(--base);border-bottom:1px solid var(--line);scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;display:inline-flex;align-items:center;gap:8px;padding:11px 15px 10px;border:0;border-right:1px solid var(--line);border-top:2px solid transparent;background:transparent;color:var(--subtle);font:400 13px/1 var(--font-code);white-space:nowrap;cursor:pointer}
+.tab .ico{font:600 9.5px/1 var(--font-code);color:var(--iris);letter-spacing:.04em}
+.tab .ico.pr{font-size:13px;color:var(--love)}
+.tab .st{min-width:10px;font-size:11px;color:var(--gold)}
+.tab .st.done{color:var(--foam)}
+.tab[aria-current="step"]{background:var(--surface);color:var(--text);border-top-color:var(--accent)}
+.tab:not(:disabled):hover{color:var(--text)}
+.tab:disabled{color:var(--muted);opacity:.6;cursor:not-allowed}
+
+.statusbar{display:flex;align-items:center;gap:16px;padding:7px 14px;background:var(--overlay);border-top:1px solid var(--line);font:400 12px/1.3 var(--font-code);color:var(--subtle)}
+.statusbar .sp{margin-left:auto}
+.statusbar .love{color:var(--love)}
+
+.foot{max-width:720px;margin:18px auto 0;text-align:center;font:italic 400 12.5px/1.5 var(--font-code);color:var(--subtle)}
+
+/* ---------- conteúdo ---------- */
+.editor{padding:clamp(18px,4.5vw,36px)}
+.panel{display:grid;gap:22px;animation:entra .35s ease both}
+@keyframes entra{from{opacity:.2;transform:translateY(6px)}to{opacity:1;transform:none}}
+.head{display:grid;gap:8px}
+.eyebrow{margin:0;font:italic 400 13.5px/1.45 var(--font-code);color:var(--subtle)}
+.headline{margin:0;font:italic 600 clamp(2.4rem,9vw,4rem)/1.04 var(--font-code);letter-spacing:-.025em;text-wrap:balance}
+.headline .hl{color:var(--accent)}
+.caret{display:inline-block;width:.42em;height:.8em;margin-left:.1em;background:var(--accent);vertical-align:-.04em;animation:pisca 1.05s steps(1) infinite}
+@keyframes pisca{50%{opacity:0}}
+h2{margin:0;font:italic 600 clamp(1.6rem,5.4vw,2.1rem)/1.12 var(--font-code);letter-spacing:-.015em;text-wrap:balance}
+h2:focus{outline:none}
+.lead{margin:0;max-width:56ch;color:var(--subtle)}
+.lead code{font:400 .86em var(--font-code);background:var(--overlay);border:1px solid var(--line);padding:.05em .4em;border-radius:5px;color:var(--text)}
+
+.term{margin:0;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:var(--base);font:400 13px/1.75 var(--font-code);color:var(--text);overflow-x:auto;min-height:calc(5 * 1.75em + 28px)}
+.term .ln{white-space:pre;min-height:1.75em}
+.c-prompt{color:var(--love)}
+.c-ok{color:var(--foam)}
+.c-warn{color:var(--gold)}
+.c-mut{color:var(--muted)}
+
+.code{margin:0;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:var(--base);font:400 13.5px/1.7 var(--font-code);white-space:pre-wrap;overflow-wrap:anywhere}
+.kw{color:var(--iris);font-style:italic}
+.str{color:var(--gold)}
+.var{color:var(--rose)}
+.fn{color:var(--foam)}
+.pn{color:var(--subtle)}
+.cm{color:var(--subtle);font-style:italic}
+
+/* ---------- botões ---------- */
+.actions{display:flex;flex-wrap:wrap;gap:12px}
+.nav{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+.btn{display:inline-flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;min-height:52px;padding:11px 18px;border-radius:11px;border:1px solid var(--line-strong);background:var(--overlay);color:var(--text);font:600 16px/1.2 var(--font-body);text-align:left;text-decoration:none;cursor:pointer;transition:transform .15s,border-color .15s,box-shadow .15s}
+.btn small{font:400 12px/1.2 var(--font-code);color:var(--subtle)}
+.btn:hover:not(:disabled){transform:translateY(-1px);border-color:var(--subtle)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn-primary small{color:inherit;opacity:.75}
+.btn-primary:hover:not(:disabled){border-color:var(--accent);box-shadow:0 12px 30px -12px var(--accent)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-ghost{min-height:44px;padding-inline:4px;background:transparent;border-color:transparent;color:var(--subtle);font:500 14px/1.2 var(--font-code)}
+.btn-ghost:hover:not(:disabled){border-color:transparent;color:var(--text);transform:none}
+
+.confirm{display:grid;gap:14px;padding:16px;border:1px dashed var(--line-strong);border-radius:10px;background:var(--base)}
+.confirm p{margin:0;font:400 14px/1.55 var(--font-code)}
+
+/* ---------- calendário ---------- */
+.cal{padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--base)}
+.cal-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.cal-title{display:grid;justify-items:center;gap:3px;text-align:center;min-width:0}
+.cal-title span{font:italic 600 18px/1.2 var(--font-code)}
+.cal-title small{font:400 11.5px/1.2 var(--font-code);color:var(--subtle)}
+.cal-btn{flex:none;width:42px;height:42px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--text);font:600 16px/1 var(--font-code);cursor:pointer}
+.cal-btn:hover:not(:disabled){border-color:var(--line-strong)}
+.cal-btn:disabled{opacity:.35;cursor:not-allowed}
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.dows{margin-bottom:6px}
+.dows span{padding-block:4px;text-align:center;font:600 12px/1 var(--font-code);color:var(--subtle)}
+.dows span:first-child,.dows span:last-child{color:var(--rose)}
+.day{position:relative;display:grid;place-items:center;height:clamp(40px,10.5vw,52px);padding:0;border-radius:9px;border:1px solid transparent;background:var(--surface);color:var(--text);font:500 15px/1 var(--font-body);font-variant-numeric:tabular-nums;cursor:pointer;transition:background .12s,border-color .12s,transform .12s}
+.day.weekend{color:var(--rose)}
+.day:not(:disabled):hover{border-color:var(--line-strong);transform:translateY(-1px)}
+.day.today{border-color:var(--foam)}
+.day:disabled{background:transparent;color:var(--muted);opacity:.55;cursor:default}
+.day[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:700}
+.mk{position:absolute;left:50%;bottom:5px;width:5px;height:5px;margin-left:-2.5px;border-radius:50%}
+.mk-hol{background:var(--gold)}
+.day[aria-pressed="true"] .mk{background:var(--on-accent)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:12px;font:400 12px/1.4 var(--font-code);color:var(--subtle)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend .mk{position:static;margin:0}
+.lg-today{width:12px;height:12px;border-radius:4px;border:1.5px solid var(--foam)}
+
+/* ---------- horários ---------- */
+.slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.slot{display:grid;gap:3px;align-content:start;padding:14px;border-radius:12px;border:1px solid var(--line);background:var(--base);color:var(--text);font:inherit;text-align:left;cursor:pointer;transition:border-color .15s,background .15s}
+.slot b{font:600 22px/1.15 var(--font-code);font-variant-numeric:tabular-nums}
+.slot span{font-size:13.5px;line-height:1.35;color:var(--subtle)}
+.slot:hover:not(:disabled){border-color:var(--line-strong)}
+.slot[aria-pressed="true"],.slot.is-on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--base))}
+.slot:disabled{opacity:.4;cursor:not-allowed}
+.slot.custom input{width:100%;min-width:0;min-height:28px;padding:0;border:0;background:transparent;color:var(--text);font:600 22px/1.15 var(--font-code);text-align:left}
+.slot.custom input:focus{outline:none}
+.slot.custom:focus-within{border-color:var(--iris)}
+.err{margin:0;font:400 13px/1.5 var(--font-code);color:var(--love)}
+
+/* ---------- programa ---------- */
+.opts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.opt{position:relative;display:grid;gap:4px;align-content:start;justify-items:start;padding:14px;border-radius:12px;border:1px solid var(--line);background:var(--base);color:var(--text);font:inherit;text-align:left;cursor:pointer;transition:border-color .15s,background .15s}
+.opt:hover{border-color:var(--line-strong)}
+.opt .emo{margin-bottom:4px;font-size:26px;line-height:1.1}
+.opt .nm{font:600 15px/1.25 var(--font-body)}
+.opt code{font:400 11.5px/1.35 var(--font-code);color:var(--subtle);overflow-wrap:anywhere}
+.opt .tick{position:absolute;top:10px;right:10px;display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:var(--on-accent);font-size:12px;opacity:0;transform:scale(.6);transition:opacity .15s,transform .15s}
+.opt[aria-pressed="true"]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--base))}
+.opt[aria-pressed="true"] .tick{opacity:1;transform:none}
+.field{display:grid;gap:8px}
+textarea{width:100%;min-height:64px;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--base);color:var(--text);font:400 16px/1.5 var(--font-body);resize:vertical}
+textarea::placeholder{color:var(--muted)}
+textarea:focus{outline:none;border-color:var(--iris)}
+
+/* ---------- pull request ---------- */
+.pr{overflow:hidden;border:1px solid var(--line);border-radius:12px;background:var(--base)}
+.pr-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);font:400 13.5px/1.4 var(--font-code)}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font:600 12px/1.4 var(--font-code);font-style:normal}
+.pill-open{background:color-mix(in srgb,var(--foam) 18%,transparent);color:var(--foam)}
+.pill-merged{background:color-mix(in srgb,var(--iris) 22%,transparent);color:var(--iris)}
+.diff{margin:0;padding:12px 0;font:400 13px/1.65 var(--font-code);white-space:pre-wrap;overflow-wrap:anywhere}
+.diff span{display:block;padding-inline:14px}
+.d-hunk{color:var(--iris)}
+.d-ctx{color:var(--subtle)}
+.d-del{color:var(--love);background:color-mix(in srgb,var(--love) 10%,transparent)}
+.d-add{color:var(--foam);background:color-mix(in srgb,var(--foam) 11%,transparent)}
+.checks{display:grid;gap:6px;margin:0;padding:12px 14px;border-top:1px solid var(--line);list-style:none;font:400 13px/1.5 var(--font-code);color:var(--subtle)}
+.reviewer{margin:0;padding:10px 14px;border-top:1px solid var(--line);font:italic 400 13px/1.4 var(--font-code);color:var(--subtle)}
+.reviewer b{color:var(--text);font-weight:600}
+
+/* ---------- encontro marcado ---------- */
+.ticket{display:grid;gap:16px;padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--base)}
+.count{display:grid;gap:4px}
+.count b{font:600 clamp(1.7rem,6.5vw,2.5rem)/1.1 var(--font-code);color:var(--accent);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.sum{display:grid;gap:8px;margin:0;padding-top:14px;border-top:1px dashed var(--line-strong)}
+.sum div{display:grid;grid-template-columns:84px minmax(0,1fr);gap:12px;align-items:baseline}
+.sum dt{font:400 12.5px/1.4 var(--font-code);color:var(--subtle)}
+.sum dd{margin:0;font-weight:500;overflow-wrap:anywhere}
+details.preview summary{cursor:pointer;font:italic 400 13px/1.4 var(--font-code);color:var(--subtle)}
+details.preview[open] summary{margin-bottom:10px}
+
+.confetti{position:fixed;inset:0;z-index:50;pointer-events:none}
+
+@media (max-width:600px){
+  .opts{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:520px){
+  .titlebar{grid-template-columns:48px minmax(0,1fr) 48px;padding:10px 12px}
+  .editor{padding:20px 16px 24px}
+  .term{padding:12px 14px;font-size:12.5px}
+  .cal{padding:10px}
+  .cal-grid{gap:4px}
+  .slots{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .actions .btn{flex:1 1 100%}
+  .nav .btn-primary{flex:1 1 auto}
+  .statusbar .hide-sm{display:none}
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<main class="window" aria-label="Convite">
+  <header class="titlebar">
+    <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+    <span class="title">agenda — ~/projetos/rolê</span>
+    <span aria-hidden="true"></span>
+  </header>
+
+  <nav class="tabs" id="tabs" aria-label="Passos do convite"></nav>
+
+  <div class="editor">
+
+    <!-- 0 · convite -->
+    <section class="panel" id="p0">
+      <div class="term" id="term" aria-label="Terminal">
+        <div class="ln"><span class="c-prompt">$ </span>npm test agenda</div>
+        <div class="ln"><span class="c-ok">✓ </span>trabalho ....... <span class="c-ok">ok</span></div>
+        <div class="ln"><span class="c-ok">✓ </span>café ........... <span class="c-ok">ok</span></div>
+        <div class="ln"><span class="c-prompt">✗ </span>rolê com você .. <span class="c-prompt">faltando</span></div>
+        <div class="ln"><span class="c-warn">1 falha. </span>abrindo convite…</div>
+      </div>
+      <div class="head">
+        <p class="eyebrow" id="hello">// oi, você</p>
+        <h1 class="headline">Tem um <span class="hl">bug</span> na minha agenda.<span class="caret" aria-hidden="true"></span></h1>
+      </div>
+      <p class="lead">Tá faltando um rolê com você nela. Me ajuda a corrigir? Você escolhe o dia, a hora e o programa, e leva menos tempo que um <code>npm install</code>.</p>
+      <div class="actions" id="introActions">
+        <button class="btn btn-primary" id="yesBtn" type="button">Bora corrigir <small>git checkout -b fix/agenda</small></button>
+        <button class="btn" id="noBtn" type="button">Agora não <small>won't fix</small></button>
+      </div>
+      <div class="confirm" id="confirmBox" hidden>
+        <p><span class="c-prompt">?</span> Fechar como won't fix? <span class="c-mut">(y/N)</span></p>
+        <div class="actions">
+          <button class="btn btn-primary" id="confirmNo" type="button">N, bora corrigir <small>voltar</small></button>
+          <button class="btn" id="confirmYes" type="button">y, won't fix <small>exit 0</small></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 1 · data -->
+    <section class="panel" id="p1" hidden>
+      <div class="head">
+        <p class="eyebrow">// passo 1 de 4 · data.ts</p>
+        <h2 tabindex="-1">Qual dia fica bom pra você?</h2>
+      </div>
+      <div class="cal">
+        <div class="cal-head">
+          <button class="cal-btn" id="prevM" type="button" aria-label="Mês anterior">←</button>
+          <div class="cal-title"><span id="calTitle" aria-live="polite">mês</span><small>calendario.render()</small></div>
+          <button class="cal-btn" id="nextM" type="button" aria-label="Próximo mês">→</button>
+        </div>
+        <div class="cal-grid dows" aria-hidden="true"><span>D</span><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span></div>
+        <div class="cal-grid" id="calGrid"></div>
+        <div class="legend">
+          <span><i class="lg-today"></i>hoje</span>
+          <span><i class="mk mk-hol"></i>feriado</span>
+        </div>
+      </div>
+      <pre class="code" id="dateCode"></pre>
+      <div class="nav">
+        <button class="btn btn-ghost" type="button" data-back>← voltar</button>
+        <button class="btn btn-primary" id="next1" type="button" disabled>Escolher horário <small>git add data.ts</small></button>
+      </div>
+    </section>
+
+    <!-- 2 · horário -->
+    <section class="panel" id="p2" hidden>
+      <div class="head">
+        <p class="eyebrow">// passo 2 de 4 · horario.ts</p>
+        <h2 tabindex="-1">Que horas?</h2>
+        <p class="lead" id="timeLead">Escolhe um dos horários ou digita outro.</p>
+      </div>
+      <div class="slots" id="slots">
+        <label class="slot custom" id="customSlot" for="customTime">
+          <input type="time" id="customTime" step="900" aria-label="Outro horário">
+          <span>outro horário</span>
+        </label>
+      </div>
+      <p class="err" id="timeErr" hidden>Esse horário já passou hoje. Escolhe um mais tarde?</p>
+      <pre class="code" id="timeCode"></pre>
+      <div class="nav">
+        <button class="btn btn-ghost" type="button" data-back>← voltar</button>
+        <button class="btn btn-primary" id="next2" type="button" disabled>Escolher o programa <small>git add horario.ts</small></button>
+      </div>
+    </section>
+
+    <!-- 3 · programa -->
+    <section class="panel" id="p3" hidden>
+      <div class="head">
+        <p class="eyebrow">// passo 3 de 4 · programa.ts</p>
+        <h2 tabindex="-1">E o que a gente faz?</h2>
+        <p class="lead">Pode marcar mais de um. Na dúvida, escolhe surpresa e deixa o resto comigo.</p>
+      </div>
+      <div class="opts" id="opts"></div>
+      <div class="field">
+        <label class="eyebrow" for="obs">// observações (opcional)</label>
+        <textarea id="obs" rows="2" maxlength="240" placeholder="ex.: não como carne, prefiro lugar tranquilo, sou do time pizza de borda recheada…"></textarea>
+      </div>
+      <div class="nav">
+        <button class="btn btn-ghost" type="button" data-back>← voltar</button>
+        <button class="btn btn-primary" id="next3" type="button" disabled>Revisar <small>git commit -m "fix: agenda"</small></button>
+      </div>
+    </section>
+
+    <!-- 4 · pull request -->
+    <section class="panel" id="p4" hidden>
+      <div class="head">
+        <p class="eyebrow">// passo 4 de 4 · pull request</p>
+        <h2 tabindex="-1">Revisa e aprova?</h2>
+        <p class="lead">Aqui está a correção. Se estiver tudo certo, é só aprovar.</p>
+      </div>
+      <div class="pr">
+        <div class="pr-head">
+          <span class="pill pill-open">● Open</span>
+          <span><b>#1</b> fix(agenda): adiciona rolê com você</span>
+        </div>
+        <pre class="diff" id="diff"></pre>
+        <ul class="checks">
+          <li><span class="c-ok">✓</span> build: passou de primeira (milagre)</li>
+          <li><span class="c-ok">✓</span> testes: 3/3 passando</li>
+          <li><span class="c-ok">✓</span> conflitos: nenhum</li>
+        </ul>
+        <p class="reviewer">revisora: <b id="reviewerName">você</b> · aguardando aprovação</p>
+      </div>
+      <div class="nav">
+        <button class="btn btn-ghost" type="button" data-back>← voltar</button>
+        <button class="btn btn-primary" id="mergeBtn" type="button">Aprovar e fazer merge <small>git merge fix/agenda</small></button>
+      </div>
+    </section>
+
+    <!-- 5 · merged -->
+    <section class="panel" id="p5" hidden>
+      <div class="head">
+        <p class="eyebrow"><span class="pill pill-merged">⎇ Merged</span></p>
+        <h2 tabindex="-1">Bug corrigido. Tá marcado!</h2>
+        <p class="lead">Só falta me mandar a resposta. Esse site não tem backend, então o WhatsApp vai ser a nossa API.</p>
+      </div>
+      <div class="ticket">
+        <div class="count">
+          <span class="eyebrow">// deploy em</span>
+          <b id="countdown">--</b>
+        </div>
+        <dl class="sum">
+          <div><dt>dia</dt><dd id="sDate"></dd></div>
+          <div><dt>horário</dt><dd id="sTime"></dd></div>
+          <div><dt>programa</dt><dd id="sProg"></dd></div>
+          <div id="sObsRow"><dt>obs</dt><dd id="sObs"></dd></div>
+        </dl>
+      </div>
+      <div class="actions">
+        <a class="btn btn-primary" id="waLink" href="https://wa.me/" target="_blank" rel="noopener">Enviar resposta no WhatsApp <small>POST /resposta</small></a>
+        <a class="btn" id="gcalLink" href="https://calendar.google.com/" target="_blank" rel="noopener">Salvar no Google Agenda <small>calendar.add()</small></a>
+        <button class="btn" id="copyBtn" type="button">Copiar resposta <small id="copyHint">Ctrl + C</small></button>
+      </div>
+      <details class="preview" id="msgDetails">
+        <summary>ver a mensagem que vai ser enviada</summary>
+        <pre class="code" id="msgPre"></pre>
+      </details>
+      <div class="nav">
+        <button class="btn btn-ghost" type="button" data-goto="1">← mudar alguma coisa</button>
+      </div>
+    </section>
+
+    <!-- recusou -->
+    <section class="panel" id="pExit" hidden>
+      <div class="term">
+        <div class="ln"><span class="c-prompt">$ </span>exit 0</div>
+        <div class="ln c-mut">processo encerrado sem erros.</div>
+      </div>
+      <div class="head">
+        <h2 tabindex="-1">Fechado como won't fix.</h2>
+        <p class="lead">Sem drama, tá tudo certo. Valeu por ter aberto! Se um dia quiser reabrir a issue, é só rodar de novo.</p>
+      </div>
+      <div class="actions">
+        <a class="btn" id="waNo" href="https://wa.me/" target="_blank" rel="noopener">Responder no WhatsApp <small>200 OK</small></a>
+        <button class="btn btn-ghost" id="restart" type="button">↻ rodar de novo</button>
+      </div>
+    </section>
+
+  </div>
+
+  <footer class="statusbar">
+    <span>⎇ fix/agenda</span>
+    <span id="sbStep">agenda.test.ts</span>
+    <span class="sp hide-sm">pt-BR · UTF-8 · <span class="love">♥</span></span>
+  </footer>
+</main>
+<p class="foot">feito à mão, com carinho e muito Ctrl+S</p>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ================= CONFIG: personalize aqui ================= */
+  const CONFIG = {
+    para: "Ana Carolina", // nome dela. Vazio = "você"
+    de: "",        // seu nome. Ex.: "Lucas". Vazio = sem nome
+    whatsapp: "5541992541561",  // seu número com DDI + DDD, só dígitos. Ex.: "5511987654321". Vazio = ela escolhe o contato
+  };
+  /* ============================================================ */
+
+  const MESES = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+  const DIAS = ["domingo","segunda-feira","terça-feira","quarta-feira","quinta-feira","sexta-feira","sábado"];
+  const NOTA_DIA = [
+    "domingo: modo economia de energia, rolê sem pressa.",
+    "segunda-feira? Ousada. Gostei.",
+    "terça: o dia mais subestimado da semana.",
+    "quarta: um hotfix bem no meio da semana.",
+    "quinta: praticamente sexta, compila igual.",
+    "sexta: deploy na sexta é proibido, rolê na sexta é liberado.",
+    "sábado: sem daily, sem reunião, só a gente.",
+  ];
+  const SLOTS = [
+    { t: "12:00", l: "almoço" },
+    { t: "15:30", l: "café da tarde" },
+    { t: "17:30", l: "pôr do sol" },
+    { t: "19:30", l: "jantar" },
+    { t: "21:00", l: "rolê da noite" },
+  ];
+  const PROGRAMAS = [
+    { id: "cafe",     emoji: "☕", nome: "Café",                 pkg: "cafe --com-bolo" },
+    { id: "pizza",    emoji: "🍕", nome: "Pizza",                pkg: "pizza@latest" },
+    { id: "japones",  emoji: "🍣", nome: "Japonês",              pkg: "sushi.map(comer)" },
+    { id: "burger",   emoji: "🍔", nome: "Hambúrguer",           pkg: "burger --cheddar" },
+    { id: "cinema",   emoji: "🎬", nome: "Cinema",               pkg: "cinema.play()" },
+    { id: "sorvete",  emoji: "🍦", nome: "Sorvete e passeio",    pkg: "walk --sem-pressa" },
+    { id: "boliche",  emoji: "🎳", nome: "Boliche ou fliperama", pkg: "game.start()" },
+    { id: "surpresa", emoji: "🎁", nome: "Surpresa",             pkg: "Math.random()" },
+  ];
+  const TABS = [
+    { file: "agenda.test.ts" },
+    { file: "data.ts" },
+    { file: "horario.ts" },
+    { file: "programa.ts" },
+    { file: "PR #1", pr: true },
+  ];
+  const MAX_MONTHS = 11;
+
+  const $ = (s) => document.querySelector(s);
+  const pad = (n) => String(n).padStart(2, "0");
+  const keyOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const sameDay = (a, b) => !!a && !!b && keyOf(a) === keyOf(b);
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const fmtLong = (d) => `${DIAS[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
+  const fmtShort = (d) => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const agora = new Date();
+  const today = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+  const minMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  let view = new Date(minMonth);
+
+  const nomePara = CONFIG.para.trim();
+  const nomeDe = CONFIG.de.trim();
+
+  const state = { step: 0, maxStep: 0, date: null, time: null, custom: false, progs: new Set(), obs: "", merged: false, declined: false };
+
+  /* ---------- feriados nacionais + datas especiais ---------- */
+  function pascoa(y) {
+    const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4;
+    const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const mes = Math.floor((h + l - 7 * m + 114) / 31), dia = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(y, mes - 1, dia);
+  }
+  const specialCache = {};
+  function specials(y) {
+    if (specialCache[y]) return specialCache[y];
+    const map = {};
+    [["01-01", "Confraternização Universal"], ["04-21", "Tiradentes"], ["05-01", "Dia do Trabalho"],
+     ["09-07", "Independência"], ["10-12", "Nossa Senhora Aparecida"], ["11-02", "Finados"],
+     ["11-15", "Proclamação da República"], ["11-20", "Consciência Negra"], ["12-25", "Natal"]]
+      .forEach(([md, nome]) => { map[`${y}-${md}`] = { type: "feriado", name: nome }; });
+    const p = pascoa(y);
+    const mais = (dias) => new Date(p.getFullYear(), p.getMonth(), p.getDate() + dias);
+    map[keyOf(mais(-2))] = { type: "feriado", name: "Sexta-feira Santa" };
+    map[keyOf(mais(-47))] = { type: "feriado", name: "Carnaval" };
+    return (specialCache[y] = map);
+  }
+  const specialOf = (d) => specials(d.getFullYear())[keyOf(d)];
+
+  function notaDo(d) {
+    const sp = specialOf(d);
+    if (sameDay(d, today)) return "hoje mesmo? Deploy direto em produção. Gostei da coragem.";
+    if (sp) return `feriado (${sp.name}): sem plantão, sem desculpa.`;
+    return NOTA_DIA[d.getDay()];
+  }
+
+  /* ---------- abas e navegação ---------- */
+  const tabsEl = $("#tabs");
+  function renderTabs() {
+    const ativa = state.declined ? 0 : Math.min(state.step, 4);
+    tabsEl.replaceChildren(...TABS.map((t, i) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "tab";
+      if (i === ativa) b.setAttribute("aria-current", "step");
+      b.disabled = state.declined ? i !== 0 : i > state.maxStep;
+      const ico = document.createElement("span");
+      ico.className = t.pr ? "ico pr" : "ico";
+      ico.textContent = t.pr ? "⎇" : "TS";
+      ico.setAttribute("aria-hidden", "true");
+      const nome = document.createElement("span");
+      nome.textContent = t.pr && state.merged ? "PR #1 · merged" : t.file;
+      const st = document.createElement("span");
+      const feito = (i < state.maxStep && !state.declined) || (t.pr && state.merged);
+      st.className = feito ? "st done" : "st";
+      st.textContent = feito ? "✓" : i === ativa ? "●" : "";
+      st.setAttribute("aria-hidden", "true");
+      b.append(ico, nome, st);
+      b.addEventListener("click", () => goTo(i));
+      return b;
+    }));
+  }
+
+  function updateStatus() {
+    const s = state.step;
+    let txt;
+    if (s === "exit") txt = "processo encerrado";
+    else if (s === 0) txt = TABS[0].file;
+    else if (s === 5) txt = "merged ✓";
+    else txt = `${TABS[s].file} · passo ${s}/4`;
+    $("#sbStep").textContent = txt;
+  }
+
+  const PANELS = { 0: "#p0", 1: "#p1", 2: "#p2", 3: "#p3", 4: "#p4", 5: "#p5", exit: "#pExit" };
+  function goTo(step, focar = true) {
+    if (step === 4 && state.merged) step = 5;
+    state.step = step;
+    if (typeof step === "number") state.maxStep = Math.max(state.maxStep, Math.min(step, 4));
+    document.querySelectorAll(".panel").forEach((p) => { p.hidden = true; });
+    const panel = $(PANELS[step]);
+    panel.hidden = false;
+    if (step === 1) renderCal();
+    if (step === 2) renderSlots();
+    if (step === 4) renderDiff();
+    if (step === 5) renderMerged();
+    renderTabs();
+    updateStatus();
+    if (focar) {
+      const h = panel.querySelector("h2");
+      if (h) h.focus({ preventScroll: true });
+      const win = $(".window");
+      if (win.getBoundingClientRect().top < 0) win.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+    }
+  }
+
+  /* ---------- 0 · convite ---------- */
+  const TERM = [
+    { typed: true, segs: [["$ ", "c-prompt"], ["npm test agenda", ""]] },
+    { segs: [["✓ ", "c-ok"], ["trabalho ....... ", ""], ["ok", "c-ok"]] },
+    { segs: [["✓ ", "c-ok"], ["café ........... ", ""], ["ok", "c-ok"]] },
+    { segs: [["✗ ", "c-prompt"], ["rolê com você .. ", ""], ["faltando", "c-prompt"]] },
+    { segs: [["1 falha. ", "c-warn"], ["abrindo convite…", ""]] },
+  ];
+  function lineEl(segs) {
+    const div = document.createElement("div");
+    div.className = "ln";
+    segs.forEach(([t, c]) => {
+      const s = document.createElement("span");
+      if (c) s.className = c;
+      s.textContent = t;
+      div.appendChild(s);
+    });
+    return div;
+  }
+  let bootId = 0;
+  async function bootTerm() {
+    const id = ++bootId;
+    const term = $("#term");
+    if (reduceMotion) { term.replaceChildren(...TERM.map((l) => lineEl(l.segs))); return; }
+    term.replaceChildren();
+    await sleep(250);
+    for (const l of TERM) {
+      if (id !== bootId) return;
+      if (l.typed) {
+        const div = lineEl(l.segs.map(([, c]) => ["", c]));
+        term.appendChild(div);
+        for (let i = 0; i < l.segs.length; i++) {
+          for (const ch of l.segs[i][0]) {
+            if (id !== bootId) return;
+            div.children[i].textContent += ch;
+            await sleep(26 + Math.random() * 34);
+          }
+        }
+        await sleep(300);
+      } else {
+        term.appendChild(lineEl(l.segs));
+        await sleep(260);
+      }
+    }
+  }
+
+  $("#hello").textContent = `// oi, ${nomePara || "você"}`;
+  $("#reviewerName").textContent = nomePara || "você";
+
+  $("#yesBtn").addEventListener("click", () => goTo(1));
+  $("#noBtn").addEventListener("click", () => {
+    $("#introActions").hidden = true;
+    $("#confirmBox").hidden = false;
+    $("#confirmNo").focus();
+  });
+  $("#confirmNo").addEventListener("click", () => {
+    $("#confirmBox").hidden = true;
+    $("#introActions").hidden = false;
+    $("#yesBtn").focus();
+  });
+  $("#confirmYes").addEventListener("click", () => {
+    state.declined = true;
+    $("#waNo").href = waUrl(`Oi${nomeDe ? `, ${nomeDe}` : ""}! Vi o convite, ficou muito criativo. Mas agora não vai rolar, tá? 🙂`);
+    goTo("exit");
+  });
+  $("#restart").addEventListener("click", () => {
+    state.declined = false;
+    $("#confirmBox").hidden = true;
+    $("#introActions").hidden = false;
+    goTo(0);
+    bootTerm();
+  });
+
+  /* ---------- 1 · data ---------- */
+  const calGrid = $("#calGrid");
+  function renderCal() {
+    const y = view.getFullYear(), m = view.getMonth();
+    $("#calTitle").textContent = `${MESES[m]} de ${y}`;
+    const diff = (y - minMonth.getFullYear()) * 12 + (m - minMonth.getMonth());
+    $("#prevM").disabled = diff <= 0;
+    $("#nextM").disabled = diff >= MAX_MONTHS;
+
+    const cells = [];
+    const vazio = new Date(y, m, 1).getDay();
+    for (let i = 0; i < vazio; i++) {
+      const s = document.createElement("span");
+      s.setAttribute("aria-hidden", "true");
+      cells.push(s);
+    }
+    const total = new Date(y, m + 1, 0).getDate();
+    for (let d = 1; d <= total; d++) {
+      const date = new Date(y, m, d);
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "day";
+      b.dataset.key = keyOf(date);
+      const num = document.createElement("span");
+      num.textContent = d;
+      b.appendChild(num);
+      let label = fmtLong(date);
+      const dow = date.getDay();
+      if (dow === 0 || dow === 6) b.classList.add("weekend");
+      if (sameDay(date, today)) { b.classList.add("today"); label += ", hoje"; }
+      const sp = specialOf(date);
+      if (sp) {
+        const mk = document.createElement("i");
+        mk.className = "mk mk-hol";
+        b.appendChild(mk);
+        b.title = sp.name;
+        label += `, ${sp.name}`;
+      }
+      if (date < today) b.disabled = true;
+      b.setAttribute("aria-label", label);
+      b.setAttribute("aria-pressed", String(sameDay(date, state.date)));
+      b.addEventListener("click", () => selectDate(date));
+      cells.push(b);
+    }
+    calGrid.replaceChildren(...cells);
+    renderDateCode();
+  }
+  function selectDate(date) {
+    state.date = date;
+    state.merged = false;
+    if (state.time && !timeOk(state.time)) { state.time = null; state.custom = false; $("#customTime").value = ""; }
+    calGrid.querySelectorAll(".day").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.key === keyOf(date))));
+    $("#next1").disabled = false;
+    renderDateCode();
+    renderTabs();
+  }
+  function renderDateCode() {
+    const el = $("#dateCode");
+    if (!state.date) {
+      el.innerHTML = `<span class="kw">let</span> <span class="var">dia</span> <span class="pn">=</span> <span class="kw">null</span><span class="pn">;</span>\n<span class="cm">// toca num dia aí em cima</span>`;
+      return;
+    }
+    el.innerHTML = `<span class="kw">const</span> <span class="var">dia</span> <span class="pn">=</span> <span class="str">"${fmtLong(state.date)}"</span><span class="pn">;</span>\n<span class="cm">// ${notaDo(state.date)}</span>`;
+  }
+  $("#prevM").addEventListener("click", () => { view = new Date(view.getFullYear(), view.getMonth() - 1, 1); renderCal(); });
+  $("#nextM").addEventListener("click", () => { view = new Date(view.getFullYear(), view.getMonth() + 1, 1); renderCal(); });
+  $("#next1").addEventListener("click", () => goTo(2));
+
+  /* ---------- 2 · horário ---------- */
+  function timeOk(t) {
+    if (!state.date || !sameDay(state.date, today)) return true;
+    const limite = new Date(Date.now() + 30 * 60 * 1000);
+    if (!sameDay(limite, today)) return false;
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + m >= limite.getHours() * 60 + limite.getMinutes();
+  }
+  const slotsEl = $("#slots"), customSlot = $("#customSlot"), customTime = $("#customTime");
+  const slotBtns = SLOTS.map((s) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "slot";
+    const hora = document.createElement("b");
+    hora.textContent = s.t;
+    const rot = document.createElement("span");
+    rot.textContent = s.l;
+    b.append(hora, rot);
+    b.addEventListener("click", () => { state.custom = false; customTime.value = ""; setTime(s.t); });
+    slotsEl.insertBefore(b, customSlot);
+    return b;
+  });
+  customTime.addEventListener("input", () => {
+    const v = customTime.value.slice(0, 5);
+    if (/^\d{2}:\d{2}$/.test(v)) { state.custom = true; setTime(v); }
+    else if (state.custom) { state.time = null; renderSlots(); }
+  });
+  function setTime(t) {
+    state.time = t;
+    state.merged = false;
+    renderSlots();
+    renderTabs();
+  }
+  function renderSlots() {
+    SLOTS.forEach((s, i) => {
+      const ok = timeOk(s.t);
+      slotBtns[i].disabled = !ok;
+      slotBtns[i].title = ok ? "" : "esse horário já passou hoje";
+      slotBtns[i].setAttribute("aria-pressed", String(!state.custom && state.time === s.t));
+    });
+    customSlot.classList.toggle("is-on", state.custom && !!state.time);
+    const valido = !!state.time && timeOk(state.time);
+    $("#timeErr").hidden = !state.time || valido;
+    $("#next2").disabled = !valido;
+    if (state.date) {
+      const d = state.date;
+      $("#timeLead").textContent = `Pra ${DIAS[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]}. Escolhe um dos horários ou digita outro.`;
+    }
+    renderTimeCode();
+  }
+  function renderTimeCode() {
+    const el = $("#timeCode");
+    if (!state.time || !state.date) {
+      el.innerHTML = `<span class="kw">let</span> <span class="var">horario</span> <span class="pn">=</span> <span class="kw">null</span><span class="pn">;</span>`;
+      return;
+    }
+    const [h, m] = state.time.split(":").map(Number);
+    const cron = `${m} ${h} ${state.date.getDate()} ${state.date.getMonth() + 1} *`;
+    el.innerHTML = `<span class="kw">const</span> <span class="var">horario</span> <span class="pn">=</span> <span class="str">"${state.time}"</span><span class="pn">;</span>\n<span class="fn">cron</span><span class="pn">(</span><span class="str">"${cron}"</span><span class="pn">);</span> <span class="cm">// execução única (por enquanto)</span>`;
+  }
+  $("#next2").addEventListener("click", () => goTo(3));
+
+  /* ---------- 3 · programa ---------- */
+  const optsEl = $("#opts");
+  PROGRAMAS.forEach((p) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "opt";
+    b.setAttribute("aria-pressed", "false");
+    const emo = document.createElement("span");
+    emo.className = "emo";
+    emo.setAttribute("aria-hidden", "true");
+    emo.textContent = p.emoji;
+    const nm = document.createElement("span");
+    nm.className = "nm";
+    nm.textContent = p.nome;
+    const pkg = document.createElement("code");
+    pkg.textContent = p.pkg;
+    const tick = document.createElement("span");
+    tick.className = "tick";
+    tick.setAttribute("aria-hidden", "true");
+    tick.textContent = "✓";
+    b.append(emo, nm, pkg, tick);
+    b.addEventListener("click", () => {
+      if (state.progs.has(p.id)) state.progs.delete(p.id); else state.progs.add(p.id);
+      b.setAttribute("aria-pressed", String(state.progs.has(p.id)));
+      state.merged = false;
+      $("#next3").disabled = state.progs.size === 0;
+      renderTabs();
+    });
+    optsEl.appendChild(b);
+  });
+  const progNames = () => PROGRAMAS.filter((p) => state.progs.has(p.id)).map((p) => p.nome);
+  $("#obs").addEventListener("input", (e) => { state.obs = e.target.value.trim(); state.merged = false; });
+  $("#next3").addEventListener("click", () => goTo(4));
+
+  /* ---------- 4 · pull request ---------- */
+  function renderDiff() {
+    const rows = [
+      ["hunk", "@@ agenda.json @@"],
+      ["ctx", "  {"],
+      ["del", '-   "data": null,'],
+      ["add", `+   "data": "${fmtLong(state.date)}",`],
+      ["del", '-   "horario": null,'],
+      ["add", `+   "horario": "${state.time}",`],
+      ["del", '-   "programa": [],'],
+      ["add", `+   "programa": [${progNames().map((n) => `"${n}"`).join(", ")}],`],
+    ];
+    if (state.obs) rows.push(["add", `+   "obs": ${JSON.stringify(state.obs)},`]);
+    rows.push(["del", '-   "bug": true'], ["add", '+   "bug": false'], ["ctx", "  }"]);
+    $("#diff").replaceChildren(...rows.map(([c, t]) => {
+      const s = document.createElement("span");
+      s.className = `d-${c}`;
+      s.textContent = t;
+      return s;
+    }));
+  }
+  $("#mergeBtn").addEventListener("click", () => {
+    state.merged = true;
+    goTo(5);
+    confetti();
+  });
+
+  /* ---------- 5 · encontro marcado ---------- */
+  function eventDate() {
+    const [h, m] = state.time.split(":").map(Number);
+    return new Date(state.date.getFullYear(), state.date.getMonth(), state.date.getDate(), h, m);
+  }
+  function buildMsg() {
+    const d = state.date;
+    const linhas = [
+      `Oi${nomeDe ? `, ${nomeDe}` : ""}! Aprovei o PR da sua agenda 😄`,
+      "",
+      `📅 ${cap(DIAS[d.getDay()])}, ${fmtShort(d)}`,
+      `⏰ ${state.time}`,
+      `🎯 ${progNames().join(", ")}`,
+    ];
+    if (state.obs) linhas.push(`💬 ${state.obs}`);
+    linhas.push("", "bug fechado ✔");
+    return linhas.join("\n");
+  }
+  function waUrl(msg) {
+    const numero = CONFIG.whatsapp.replace(/\D/g, "");
+    return `https://wa.me/${numero}?text=${encodeURIComponent(msg)}`;
+  }
+  function gcalUrl() {
+    const ini = eventDate();
+    const fim = new Date(ini.getTime() + 3 * 60 * 60 * 1000);
+    const f = (dt) => `${dt.getFullYear()}${pad(dt.getMonth() + 1)}${pad(dt.getDate())}T${pad(dt.getHours())}${pad(dt.getMinutes())}00`;
+    let tz = "America/Sao_Paulo";
+    try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || tz; } catch (e) { /* mantém o padrão */ }
+    const titulo = nomeDe ? `Rolê com ${nomeDe}` : "Rolê marcado";
+    const detalhes = `Programa: ${progNames().join(", ")}${state.obs ? `\nObs.: ${state.obs}` : ""}\n\nbug fechado: fix/agenda`;
+    const q = new URLSearchParams({ action: "TEMPLATE", text: titulo, dates: `${f(ini)}/${f(fim)}`, details: detalhes, ctz: tz });
+    return `https://calendar.google.com/calendar/render?${q.toString()}`;
+  }
+
+  let timer = null;
+  function tick() {
+    const el = $("#countdown");
+    const ms = eventDate() - Date.now();
+    if (ms <= 0) { el.textContent = "é agora!"; clearInterval(timer); return; }
+    const s = Math.floor(ms / 1000);
+    const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60), seg = s % 60;
+    el.textContent = `${d}d ${pad(h)}h ${pad(m)}m ${pad(seg)}s`;
+  }
+  function renderMerged() {
+    $("#sDate").textContent = cap(fmtLong(state.date));
+    $("#sTime").textContent = state.time;
+    $("#sProg").textContent = progNames().join(", ");
+    $("#sObsRow").hidden = !state.obs;
+    $("#sObs").textContent = state.obs;
+    const msg = buildMsg();
+    $("#msgPre").textContent = msg;
+    $("#waLink").href = waUrl(msg);
+    $("#gcalLink").href = gcalUrl();
+    clearInterval(timer);
+    tick();
+    timer = setInterval(tick, 1000);
+  }
+
+  $("#copyBtn").addEventListener("click", async () => {
+    const hint = $("#copyHint");
+    try {
+      await navigator.clipboard.writeText(buildMsg());
+      hint.textContent = "copiado ✓";
+    } catch (e) {
+      $("#msgDetails").open = true;
+      const r = document.createRange();
+      r.selectNodeContents($("#msgPre"));
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+      hint.textContent = "texto selecionado, é só copiar";
+    }
+    setTimeout(() => { hint.textContent = "Ctrl + C"; }, 2500);
+  });
+
+  document.querySelectorAll("[data-back]").forEach((b) => b.addEventListener("click", () => goTo(state.step - 1)));
+  document.querySelectorAll("[data-goto]").forEach((b) => b.addEventListener("click", () => goTo(Number(b.dataset.goto))));
+
+  /* ---------- confete de código ---------- */
+  function confetti() {
+    if (reduceMotion) return;
+    const c = document.createElement("canvas");
+    c.className = "confetti";
+    document.body.appendChild(c);
+    const ctx = c.getContext("2d");
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const W = window.innerWidth, H = window.innerHeight;
+    c.width = W * dpr; c.height = H * dpr;
+    c.style.width = W + "px"; c.style.height = H + "px";
+    ctx.scale(dpr, dpr);
+    const cs = getComputedStyle(document.documentElement);
+    const cores = ["--love", "--gold", "--foam", "--iris", "--rose"].map((v) => cs.getPropertyValue(v).trim());
+    const glifos = ["♥", "♥", "♥", "{ }", "</>", ";", "=>", "✓", "1", "0", "♥"];
+    const parts = Array.from({ length: 110 }, () => ({
+      x: W / 2 + (Math.random() - 0.5) * Math.min(W, 520),
+      y: H * 0.45,
+      vx: (Math.random() - 0.5) * 11,
+      vy: -Math.random() * 11 - 5,
+      r: Math.random() * Math.PI,
+      vr: (Math.random() - 0.5) * 0.2,
+      s: 12 + Math.random() * 16,
+      g: glifos[Math.floor(Math.random() * glifos.length)],
+      c: cores[Math.floor(Math.random() * cores.length)],
+    }));
+    const t0 = performance.now();
+    function frame(t) {
+      const el = t - t0;
+      ctx.clearRect(0, 0, W, H);
+      ctx.globalAlpha = Math.max(0, 1 - el / 3800);
+      for (const p of parts) {
+        p.vy += 0.24; p.vx *= 0.99;
+        p.x += p.vx; p.y += p.vy; p.r += p.vr;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.r);
+        ctx.fillStyle = p.c;
+        ctx.font = `600 ${p.s}px "Victor Mono", monospace`;
+        ctx.fillText(p.g, 0, 0);
+        ctx.restore();
+      }
+      if (el < 3900) requestAnimationFrame(frame); else c.remove();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- início ---------- */
+  renderTabs();
+  updateStatus();
+  renderDateCode();
+  renderTimeCode();
+  bootTerm();
+})();
+</script>
+</body>
+</html>
